@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.lang.StringIndexOutOfBoundsException;
 
 import com.sun.faban.driver.HttpTransport;
 
@@ -122,21 +123,30 @@ public class UserGenerator {
 		updateElggTokenAndTs(tokenTsPair, sb);
 
 		i = 0;
-		for (UserEntity user: userList) {
-			headers.put("Referer", hostURL+"/admin");
-			sb = http.fetchURL(hostURL+"/admin/users/add", headers);
-			updateElggTokenAndTs(tokenTsPair, sb);
+		int retryCount = 0; 
+		while (i < userList.size() && retryCount < 4) {
+			UserEntity user = userList.get(i);
+			try {
+				headers.put("Referer", hostURL+"/admin");
+				sb = http.fetchURL(hostURL+"/admin/users/add", headers);
+				updateElggTokenAndTs(tokenTsPair, sb);
 
-			String postRequest = "__elgg_token="+tokenTsPair.getValue1()+"&__elgg_ts="
-					+tokenTsPair.getValue2()+"&name="+user.getDisplayName()+"&username="+user.getUserName()+"&email="+user.getEmail()+"&password="+user.getPassword()
-					+"&password2="+user.getPassword()+"&admin=0";
-			headers.put("Referer", hostURL+"/admin/users/add");
-			sb = http.fetchURL(hostURL+"/action/useradd", postRequest, headers);
-			int startIndex = sb.indexOf("GUID#")+"GUID#".length();
-			int endIndex = sb.indexOf("#", startIndex);
-			String guid = sb.substring(startIndex, endIndex);
-			user.setGuid(guid);
-			System.out.println("User"+i+++" generated.");
+				String postRequest = "__elgg_token="+tokenTsPair.getValue1()+"&__elgg_ts="
+						+tokenTsPair.getValue2()+"&name="+user.getDisplayName()+"&username="+user.getUserName()+"&email="+user.getEmail()+"&password="+user.getPassword()
+						+"&password2="+user.getPassword()+"&admin=0";
+				headers.put("Referer", hostURL+"/admin/users/add");
+				sb = http.fetchURL(hostURL+"/action/useradd", postRequest, headers);
+
+				int startIndex = sb.indexOf("GUID#")+"GUID#".length();
+				int endIndex = sb.indexOf("#", startIndex);
+				String guid = sb.substring(startIndex, endIndex);
+				user.setGuid(guid);
+				System.out.println("User"+i+++" generated.");
+			  	retryCount = 0;
+			} catch (StringIndexOutOfBoundsException e) {
+				System.out.println("User"+i+" failed!. Running again!");
+			  	retryCount += 1;
+			}	
 		}
 	}
 	
